@@ -1,6 +1,13 @@
 *.ipynb
 .pytype
 .DS_Store
+
+# Sokrates static analysis output (local only)
+_sokrates/
+sokrates.jar
+
+# Local demo/scratch files
+rich_demo.py
 .vscode
 .idea/
 mypy_report
