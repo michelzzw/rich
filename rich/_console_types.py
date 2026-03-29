@@ -54,6 +54,7 @@ OverflowMethod = Literal["fold", "crop", "ellipsis", "ignore"]
 # NoChange sentinel
 # ---------------------------------------------------------------------------
 
+
 class NoChange:
     pass
 
@@ -64,6 +65,7 @@ NO_CHANGE = NoChange()
 # ---------------------------------------------------------------------------
 # ConsoleDimensions
 # ---------------------------------------------------------------------------
+
 
 class ConsoleDimensions(NamedTuple):
     """Size of the terminal."""
@@ -77,6 +79,7 @@ class ConsoleDimensions(NamedTuple):
 # ---------------------------------------------------------------------------
 # ConsoleOptions
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class ConsoleOptions:
@@ -216,6 +219,7 @@ class ConsoleOptions:
 # Protocols
 # ---------------------------------------------------------------------------
 
+
 @runtime_checkable
 class RichCast(Protocol):
     """An object that may be 'cast' to a console renderable."""
@@ -254,6 +258,7 @@ _null_highlighter = NullHighlighter()
 # Exceptions
 # ---------------------------------------------------------------------------
 
+
 class CaptureError(Exception):
     """An error in the Capture context manager."""
 
@@ -261,6 +266,7 @@ class CaptureError(Exception):
 # ---------------------------------------------------------------------------
 # Renderables
 # ---------------------------------------------------------------------------
+
 
 class NewLine:
     """A renderable to generate new line(s)"""
@@ -295,6 +301,7 @@ class ScreenUpdate:
 # ---------------------------------------------------------------------------
 # Context managers
 # ---------------------------------------------------------------------------
+
 
 class Capture:
     """Context manager to capture the result of printing to the console.
@@ -440,6 +447,7 @@ class ScreenContext:
 # Group and group() decorator
 # ---------------------------------------------------------------------------
 
+
 class Group:
     """Takes a group of renderables and returns a renderable object that renders the group.
 
@@ -499,6 +507,7 @@ def group(fit: bool = True) -> Callable[..., Callable[..., Group]]:
 # Thread-local console state
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class ConsoleThreadLocals(threading.local):
     """Thread local values for Console context."""
@@ -511,6 +520,7 @@ class ConsoleThreadLocals(threading.local):
 # ---------------------------------------------------------------------------
 # RenderHook
 # ---------------------------------------------------------------------------
+
 
 class RenderHook(ABC):
     """Provides hooks in to the render process."""
