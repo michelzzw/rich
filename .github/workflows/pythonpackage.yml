@@ -3,7 +3,7 @@ name: Test Rich module
 on: [pull_request]
 
 jobs:
-  build:
+  Test:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
