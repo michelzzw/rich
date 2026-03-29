@@ -1756,6 +1756,7 @@ class Console(_ConsoleExportMixin):
                 result = input()
         return result
 
+
 if __name__ == "__main__":  # pragma: no cover
     console = Console(record=True)
 
