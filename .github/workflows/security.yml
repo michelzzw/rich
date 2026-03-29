@@ -60,14 +60,20 @@ jobs:
               print("No report generated.")
               sys.exit(0)
 
-          vulns = data.get("vulnerabilities", [])
-          if not vulns:
+          # pip-audit JSON format: list of {name, version, vulns: [...]}
+          packages_with_vulns = [p for p in data if p.get("vulns")]
+          total = sum(len(p["vulns"]) for p in packages_with_vulns)
+
+          if not packages_with_vulns:
               print("✅  No known vulnerabilities found.")
           else:
-              print(f"⚠️  {len(vulns)} vulnerability/ies found:")
-              for v in vulns:
-                  for alias in v.get("aliases", [v.get("id", "?")]):
-                      print(f"  • {v['name']} {v['version']} — {alias}")
+              print(f"⚠️  {total} vulnerability/ies found in {len(packages_with_vulns)} package(s):")
+              for pkg in packages_with_vulns:
+                  for v in pkg["vulns"]:
+                      ids = ", ".join(v.get("aliases", [v.get("id", "?")]))
+                      fix = v.get("fix_versions") or ["no fix available"]
+                      print(f"  • {pkg['name']} {pkg['version']} — {ids}")
+                      print(f"    Fix: upgrade to {fix}")
           EOF
 
       - name: Upload audit report
