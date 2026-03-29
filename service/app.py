@@ -7,22 +7,31 @@ import io
 import logging
 
 from fastapi import FastAPI, HTTPException
+from prometheus_fastapi_instrumentator import Instrumentator
+from pythonjsonlogger import jsonlogger
 from pydantic import BaseModel
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.syntax import Syntax
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s — %(message)s",
+# ── Structured JSON logging (parsed by Loki) ─────────────────────────────────
+handler = logging.StreamHandler()
+handler.setFormatter(
+    jsonlogger.JsonFormatter("%(asctime)s %(levelname)s %(name)s %(message)s")
 )
+logging.root.handlers = [handler]
+logging.root.setLevel(logging.INFO)
 logger = logging.getLogger("rich_service")
 
+# ── FastAPI app ───────────────────────────────────────────────────────────────
 app = FastAPI(
     title="Rich Render Service",
     description="HTTP wrapper around the Rich Python library (MGL842 TP2 demo).",
     version="1.0.0",
 )
+
+# ── Prometheus metrics (auto-instruments all endpoints) ──────────────────────
+Instrumentator().instrument(app).expose(app)
 
 
 class RenderRequest(BaseModel):
@@ -55,10 +64,12 @@ def render(request: RenderRequest):
     - ``text``:     Plain Rich console output
     """
     logger.info(
-        "render request format=%s lang=%s size=%d",
-        request.format,
-        request.language,
-        len(request.content),
+        "render request",
+        extra={
+            "format": request.format,
+            "language": request.language,
+            "size": len(request.content),
+        },
     )
 
     try:
@@ -95,5 +106,5 @@ def render(request: RenderRequest):
     except HTTPException:
         raise
     except Exception as exc:
-        logger.error("render failed: %s", exc)
+        logger.error("render failed", extra={"error": str(exc)})
         raise HTTPException(status_code=500, detail=str(exc)) from exc
