@@ -14,7 +14,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum(rate(http_requests_total{app_name=\"rich-render-service\"}[1m]))",
+          "expr": "sum(rate(http_requests_total[1m]))",
           "legendFormat": "req/s"
         }
       ],
@@ -41,7 +41,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum(rate(http_requests_total{app_name=\"rich-render-service\",status_code=~\"5..\"}[1m]))",
+          "expr": "sum(rate(http_requests_total{status=~\"5..\"}[1m]))",
           "legendFormat": "errors/s"
         }
       ],
@@ -67,7 +67,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{app_name=\"rich-render-service\"}[1m])) by (le))",
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_highr_seconds_bucket[1m])) by (le))",
           "legendFormat": "p95"
         }
       ],
@@ -94,7 +94,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{app_name=\"rich-render-service\"}[1m])) by (le))",
+          "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_highr_seconds_bucket[1m])) by (le))",
           "legendFormat": "p99"
         }
       ],
@@ -121,7 +121,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum by (handler, method) (rate(http_requests_total{app_name=\"rich-render-service\"}[1m]))",
+          "expr": "sum by (handler, method) (rate(http_requests_total[1m]))",
           "legendFormat": "{{method}} {{handler}}"
         }
       ],
@@ -137,15 +137,15 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{app_name=\"rich-render-service\"}[1m])) by (le))",
+          "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_highr_seconds_bucket[1m])) by (le))",
           "legendFormat": "p50"
         },
         {
-          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{app_name=\"rich-render-service\"}[1m])) by (le))",
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_highr_seconds_bucket[1m])) by (le))",
           "legendFormat": "p95"
         },
         {
-          "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{app_name=\"rich-render-service\"}[1m])) by (le))",
+          "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_highr_seconds_bucket[1m])) by (le))",
           "legendFormat": "p99"
         }
       ],

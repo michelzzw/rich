@@ -1,0 +1,60 @@
+// Discover all Docker containers
+discovery.docker "containers" {
+  host             = "unix:///var/run/docker.sock"
+  refresh_interval = "5s"
+}
+
+// Relabel: extract container name and stream
+discovery.relabel "containers" {
+  targets = discovery.docker.containers.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_log_stream"]
+    target_label  = "stream"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+  }
+}
+
+// Collect logs from Docker containers
+loki.source.docker "default" {
+  host             = "unix:///var/run/docker.sock"
+  targets          = discovery.relabel.containers.output
+  forward_to       = [loki.process.json_logs.receiver]
+  refresh_interval = "5s"
+}
+
+// Parse JSON log fields as labels
+loki.process "json_logs" {
+  stage.json {
+    expressions = {
+      level  = "levelname",
+      logger = "name",
+    }
+  }
+
+  stage.labels {
+    values = {
+      level  = "",
+      logger = "",
+    }
+  }
+
+  forward_to = [loki.write.default.receiver]
+}
+
+// Send to Loki
+loki.write "default" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
