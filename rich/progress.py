@@ -19,6 +19,7 @@ from typing import (
     Any,
     BinaryIO,
     Callable,
+    ClassVar,
     ContextManager,
     Deque,
     Dict,
@@ -555,6 +556,26 @@ class ProgressColumn(ABC):
         """Should return a renderable object."""
 
 
+class _FormattedColumn(ProgressColumn):
+    """Intermediate base for columns that render a computed string as styled Text.
+
+    Implements the Template Method pattern recommended in TP1 (R3): subclasses
+    set ``_style`` and implement ``_get_text()``; this class handles the
+    repeated ``return Text(value, style=X)`` boilerplate identified by Sokrates
+    across FileSizeColumn, TotalFileSizeColumn, MofNCompleteColumn,
+    DownloadColumn and TransferSpeedColumn.
+    """
+
+    _style: ClassVar[str] = ""
+
+    @abstractmethod
+    def _get_text(self, task: "Task") -> str:
+        """Compute the string value to display for *task*."""
+
+    def render(self, task: "Task") -> Text:
+        return Text(self._get_text(task), style=self._style)
+
+
 class RenderableColumn(ProgressColumn):
     """A column to insert an arbitrary column.
 
@@ -823,25 +844,25 @@ class TimeRemainingColumn(ProgressColumn):
         return Text(formatted, style=style)
 
 
-class FileSizeColumn(ProgressColumn):
+class FileSizeColumn(_FormattedColumn):
     """Renders completed filesize."""
 
-    def render(self, task: "Task") -> Text:
-        """Show data completed."""
-        data_size = filesize.decimal(int(task.completed))
-        return Text(data_size, style="progress.filesize")
+    _style = "progress.filesize"
+
+    def _get_text(self, task: "Task") -> str:
+        return filesize.decimal(int(task.completed))
 
 
-class TotalFileSizeColumn(ProgressColumn):
+class TotalFileSizeColumn(_FormattedColumn):
     """Renders total filesize."""
 
-    def render(self, task: "Task") -> Text:
-        """Show data completed."""
-        data_size = filesize.decimal(int(task.total)) if task.total is not None else ""
-        return Text(data_size, style="progress.filesize.total")
+    _style = "progress.filesize.total"
+
+    def _get_text(self, task: "Task") -> str:
+        return filesize.decimal(int(task.total)) if task.total is not None else ""
 
 
-class MofNCompleteColumn(ProgressColumn):
+class MofNCompleteColumn(_FormattedColumn):
     """Renders completed count/total, e.g. '  10/1000'.
 
     Best for bounded tasks with int quantities.
@@ -857,18 +878,16 @@ class MofNCompleteColumn(ProgressColumn):
         self.separator = separator
         super().__init__(table_column=table_column)
 
-    def render(self, task: "Task") -> Text:
-        """Show completed/total."""
+    _style = "progress.download"
+
+    def _get_text(self, task: "Task") -> str:
         completed = int(task.completed)
         total = int(task.total) if task.total is not None else "?"
         total_width = len(str(total))
-        return Text(
-            f"{completed:{total_width}d}{self.separator}{total}",
-            style="progress.download",
-        )
+        return f"{completed:{total_width}d}{self.separator}{total}"
 
 
-class DownloadColumn(ProgressColumn):
+class DownloadColumn(_FormattedColumn):
     """Renders file size downloaded and total, e.g. '0.5/2.3 GB'.
 
     Args:
@@ -881,7 +900,9 @@ class DownloadColumn(ProgressColumn):
         self.binary_units = binary_units
         super().__init__(table_column=table_column)
 
-    def render(self, task: "Task") -> Text:
+    _style = "progress.download"
+
+    def _get_text(self, task: "Task") -> str:
         """Calculate common unit for completed and total."""
         completed = int(task.completed)
 
@@ -912,21 +933,20 @@ class DownloadColumn(ProgressColumn):
         else:
             total_str = "?"
 
-        download_status = f"{completed_str}/{total_str} {suffix}"
-        download_text = Text(download_status, style="progress.download")
-        return download_text
+        return f"{completed_str}/{total_str} {suffix}"
 
 
-class TransferSpeedColumn(ProgressColumn):
+class TransferSpeedColumn(_FormattedColumn):
     """Renders human readable transfer speed."""
 
-    def render(self, task: "Task") -> Text:
-        """Show data transfer speed."""
+    _style = "progress.data.speed"
+
+    def _get_text(self, task: "Task") -> str:
         speed = task.finished_speed or task.speed
         if speed is None:
-            return Text("?", style="progress.data.speed")
+            return "?"
         data_speed = filesize.decimal(int(speed))
-        return Text(f"{data_speed}/s", style="progress.data.speed")
+        return f"{data_speed}/s"
 
 
 class ProgressSample(NamedTuple):
