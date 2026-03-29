@@ -40,6 +40,7 @@ from .theme import Theme, ThemeStack
 
 if TYPE_CHECKING:
     from rich.console import Console
+    from .text import Text
 
 # ---------------------------------------------------------------------------
 # Type aliases
