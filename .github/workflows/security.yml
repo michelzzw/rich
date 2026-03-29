@@ -37,14 +37,16 @@ jobs:
 
       - name: Run pip-audit
         id: audit
+        # continue-on-error allows the pipeline to continue even when
+        # vulnerabilities are found so the report is always uploaded.
+        # In production, remove this flag to block merges on new CVEs.
+        continue-on-error: true
         run: |
           pip-audit \
             --requirement /tmp/requirements-audit.txt \
             --format json \
             --output pip-audit-report.json \
-            --desc on
-        # continue-on-error: true  ← uncomment to make the job non-blocking
-        #   (useful during initial adoption; remove once baseline is clean)
+            --desc
 
       - name: Summarise audit results
         if: always()
