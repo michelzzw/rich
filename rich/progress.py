@@ -29,6 +29,7 @@ from typing import (
     NamedTuple,
     NewType,
     Optional,
+    Sequence,
     TextIO,
     Tuple,
     Type,
@@ -101,6 +102,32 @@ class _TrackThread(Thread):
         self.join()
 
 
+def _build_progress_bar_columns(
+    description: str,
+    style: StyleType,
+    complete_style: StyleType,
+    finished_style: StyleType,
+    pulse_style: StyleType,
+    end_columns: Sequence["ProgressColumn"],
+) -> List["ProgressColumn"]:
+    """Build the standard [description +] bar + end_columns list."""
+    cols: List["ProgressColumn"] = (
+        [TextColumn("[progress.description]{task.description}")] if description else []
+    )
+    cols.extend(
+        (
+            BarColumn(
+                style=style,
+                complete_style=complete_style,
+                finished_style=finished_style,
+                pulse_style=pulse_style,
+            ),
+            *end_columns,
+        )
+    )
+    return cols
+
+
 def track(
     sequence: Iterable[ProgressType],
     description: str = "Working...",
@@ -144,20 +171,16 @@ def track(
 
     """
 
-    columns: List["ProgressColumn"] = (
-        [TextColumn("[progress.description]{task.description}")] if description else []
-    )
-    columns.extend(
-        (
-            BarColumn(
-                style=style,
-                complete_style=complete_style,
-                finished_style=finished_style,
-                pulse_style=pulse_style,
-            ),
+    columns = _build_progress_bar_columns(
+        description,
+        style,
+        complete_style,
+        finished_style,
+        pulse_style,
+        [
             TaskProgressColumn(show_speed=show_speed),
             TimeRemainingColumn(elapsed_when_finished=True),
-        )
+        ],
     )
     progress = Progress(
         *columns,
@@ -339,20 +362,13 @@ def wrap_file(
 
     """
 
-    columns: List["ProgressColumn"] = (
-        [TextColumn("[progress.description]{task.description}")] if description else []
-    )
-    columns.extend(
-        (
-            BarColumn(
-                style=style,
-                complete_style=complete_style,
-                finished_style=finished_style,
-                pulse_style=pulse_style,
-            ),
-            DownloadColumn(),
-            TimeRemainingColumn(),
-        )
+    columns = _build_progress_bar_columns(
+        description,
+        style,
+        complete_style,
+        finished_style,
+        pulse_style,
+        [DownloadColumn(), TimeRemainingColumn()],
     )
     progress = Progress(
         *columns,
@@ -466,20 +482,13 @@ def open(
 
     """
 
-    columns: List["ProgressColumn"] = (
-        [TextColumn("[progress.description]{task.description}")] if description else []
-    )
-    columns.extend(
-        (
-            BarColumn(
-                style=style,
-                complete_style=complete_style,
-                finished_style=finished_style,
-                pulse_style=pulse_style,
-            ),
-            DownloadColumn(),
-            TimeRemainingColumn(),
-        )
+    columns = _build_progress_bar_columns(
+        description,
+        style,
+        complete_style,
+        finished_style,
+        pulse_style,
+        [DownloadColumn(), TimeRemainingColumn()],
     )
     progress = Progress(
         *columns,
@@ -632,8 +641,9 @@ class TextColumn(ProgressColumn):
         self.highlighter = highlighter
         super().__init__(table_column=table_column or Column(no_wrap=True))
 
-    def render(self, task: "Task") -> Text:
-        _text = self.text_format.format(task=task)
+    def _render_text(self, text_format: str, task: "Task") -> Text:
+        """Render a format string into a Text object, applying markup and highlighting."""
+        _text = text_format.format(task=task)
         if self.markup:
             text = Text.from_markup(_text, style=self.style, justify=self.justify)
         else:
@@ -641,6 +651,9 @@ class TextColumn(ProgressColumn):
         if self.highlighter:
             self.highlighter.highlight(text)
         return text
+
+    def render(self, task: "Task") -> Text:
+        return self._render_text(self.text_format, task)
 
 
 class BarColumn(ProgressColumn):
@@ -759,14 +772,7 @@ class TaskProgressColumn(TextColumn):
         text_format = (
             self.text_format_no_percentage if task.total is None else self.text_format
         )
-        _text = text_format.format(task=task)
-        if self.markup:
-            text = Text.from_markup(_text, style=self.style, justify=self.justify)
-        else:
-            text = Text(_text, style=self.style, justify=self.justify)
-        if self.highlighter:
-            self.highlighter.highlight(text)
-        return text
+        return self._render_text(text_format, task)
 
 
 class TimeRemainingColumn(ProgressColumn):
