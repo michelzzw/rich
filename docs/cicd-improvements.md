@@ -51,7 +51,7 @@ pygments 2.19.2  CVE-2026-4539
 ReDoS vulnerability in AdlLexer (pygments/lexers/archetype.py)
 Fix: upgrade pygments when a patched version is released
 ```
-This confirmed TP1's prediction: "la chaîne de dépendances reste non surveillée."
+This confirmed TP1's prediction that the dependency chain was unmonitored.
 The scan detected a real CVE on day one of activation.
 
 **radon findings (baseline, before any refactoring):**
