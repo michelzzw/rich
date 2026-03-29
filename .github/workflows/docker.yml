@@ -1,0 +1,110 @@
+name: Docker Build & Deploy
+
+# Builds the Rich Render Service Docker image on every PR (validation only)
+# and pushes it to GitHub Container Registry (ghcr.io) on every merge to master.
+#
+# Image: ghcr.io/michelzzw/rich-service:latest
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+
+  docker:
+    name: Build, Test & Push Docker Image
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write   # required to push to ghcr.io
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Build setup ──────────────────────────────────────────────────────
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Build ────────────────────────────────────────────────────────────
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          # Push only on merge to master; on PRs we only validate the build
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/rich-service:latest
+            ghcr.io/${{ github.repository_owner }}/rich-service:${{ github.sha }}
+          # Layer cache via GitHub Actions cache backend
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          # Load image locally so we can test it (even on PRs)
+          load: ${{ github.event_name == 'pull_request' }}
+
+      # ── Smoke test ───────────────────────────────────────────────────────
+      - name: Start container for smoke test
+        run: |
+          docker run -d \
+            --name rich-smoke \
+            -p 8000:8000 \
+            ghcr.io/${{ github.repository_owner }}/rich-service:latest \
+            || docker run -d --name rich-smoke -p 8000:8000 $(docker build -q .)
+
+      - name: Wait for service to be ready
+        run: |
+          for i in $(seq 1 12); do
+            if curl -sf http://localhost:8000/health > /dev/null; then
+              echo "Service is up after ${i}×5 s"
+              exit 0
+            fi
+            echo "Waiting… ($i/12)"
+            sleep 5
+          done
+          echo "Service did not start in time" >&2
+          docker logs rich-smoke
+          exit 1
+
+      - name: Health check
+        run: |
+          response=$(curl -sf http://localhost:8000/health)
+          echo "Health response: $response"
+          echo "$response" | python -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          assert data.get('status') == 'ok', f'Unexpected status: {data}'
+          print('✅  Health check passed')
+          "
+
+      - name: Render endpoint smoke test
+        run: |
+          curl -sf -X POST http://localhost:8000/render \
+            -H "Content-Type: application/json" \
+            -d '{
+              "content": "# TP2 Demo\n\nThis response confirms that **Rich Render Service** is running correctly inside Docker.",
+              "format": "markdown"
+            }' \
+          | python -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          assert 'html' in data, 'Missing html field'
+          assert 'ansi' in data, 'Missing ansi field'
+          assert data['format'] == 'markdown', f'Wrong format: {data[\"format\"]}'
+          print('✅  Render endpoint smoke test passed')
+          print(f'    HTML length : {len(data[\"html\"])} chars')
+          print(f'    ANSI length : {len(data[\"ansi\"])} chars')
+          "
+
+      - name: Stop container
+        if: always()
+        run: docker stop rich-smoke || true

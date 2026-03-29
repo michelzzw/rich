@@ -1,0 +1,155 @@
+name: Security & Code Quality
+
+# Runs on every PR and every push to master.
+# Addresses TP1 recommendations R3 (duplication/complexity monitoring) and R5 (security scan).
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+
+  # ── R5 — Dependency vulnerability scan ─────────────────────────────────────
+  dependency-audit:
+    name: Dependency Audit (pip-audit)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry and project dependencies
+        run: |
+          pip install poetry pip-audit
+          poetry install
+
+      - name: Export dependency list
+        run: |
+          poetry export --without-hashes -f requirements.txt -o /tmp/requirements-audit.txt
+          echo "Auditing $(wc -l < /tmp/requirements-audit.txt) direct/transitive dependencies"
+
+      - name: Run pip-audit
+        id: audit
+        run: |
+          pip-audit \
+            --requirement /tmp/requirements-audit.txt \
+            --format json \
+            --output pip-audit-report.json \
+            --desc on
+        # continue-on-error: true  ← uncomment to make the job non-blocking
+        #   (useful during initial adoption; remove once baseline is clean)
+
+      - name: Summarise audit results
+        if: always()
+        run: |
+          python - <<'EOF'
+          import json, sys
+          try:
+              with open("pip-audit-report.json") as f:
+                  data = json.load(f)
+          except FileNotFoundError:
+              print("No report generated.")
+              sys.exit(0)
+
+          vulns = data.get("vulnerabilities", [])
+          if not vulns:
+              print("✅  No known vulnerabilities found.")
+          else:
+              print(f"⚠️  {len(vulns)} vulnerability/ies found:")
+              for v in vulns:
+                  for alias in v.get("aliases", [v.get("id", "?")]):
+                      print(f"  • {v['name']} {v['version']} — {alias}")
+          EOF
+
+      - name: Upload audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pip-audit-report
+          path: pip-audit-report.json
+
+  # ── Code complexity analysis (radon) ───────────────────────────────────────
+  # Tracks the TP1 metrics: cyclomatic complexity and duplication indicators.
+  # Generates a step summary visible directly in the GitHub Actions UI.
+  code-complexity:
+    name: Code Complexity (radon)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install radon
+        run: pip install radon
+
+      - name: Cyclomatic complexity — full report
+        run: |
+          echo "### Cyclomatic Complexity — units with CC ≥ B (CC > 5)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          radon cc rich/ -s -n B --show-complexity 2>&1 | tee /tmp/cc-report.txt >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Check SIG threshold — CC > 50 must be 0 %
+        run: |
+          python - <<'EOF'
+          import subprocess, json, sys
+
+          result = subprocess.run(
+              ["radon", "cc", "rich/", "--json"],
+              capture_output=True, text=True,
+          )
+          data = json.loads(result.stdout) if result.stdout.strip() else {}
+
+          violations = []
+          for filepath, units in data.items():
+              for unit in units:
+                  cc = unit.get("complexity", 0)
+                  if cc > 50:
+                      violations.append(
+                          f"{filepath}::{unit['name']}  CC={cc}  ({unit['type']})"
+                      )
+
+          print(f"Units with CC > 50 (SIG 4-star: must be 0%):")
+          if violations:
+              for v in violations:
+                  print(f"  ⚠  {v}")
+              print(
+                  "\nThese units were identified in TP1 and are tracked "
+                  "via issues #1 and #2."
+              )
+              # Non-blocking for now — improvement tracked in issues #1 & #2
+          else:
+              print("  ✅  None found.")
+          EOF
+
+      - name: Maintainability index
+        run: |
+          echo "### Maintainability Index" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          radon mi rich/ -s 2>&1 | tee /tmp/mi-report.txt >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Raw metrics summary
+        run: |
+          echo "### Raw Metrics (LOC / LLOC / SLOC)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          radon raw rich/ -s 2>&1 | tail -20 >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload complexity report
+        uses: actions/upload-artifact@v4
+        with:
+          name: complexity-report
+          path: |
+            /tmp/cc-report.txt
+            /tmp/mi-report.txt
