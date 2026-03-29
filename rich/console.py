@@ -206,6 +206,7 @@ class Console:
     """
 
     _environ: Mapping[str, str] = os.environ
+    safe_box: bool
 
     def __init__(
         self,
