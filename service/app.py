@@ -7,6 +7,7 @@ import io
 import logging
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 from pythonjsonlogger import jsonlogger
 from pydantic import BaseModel
@@ -29,6 +30,9 @@ app = FastAPI(
     description="HTTP wrapper around the Rich Python library (MGL842 TP2 demo).",
     version="1.0.0",
 )
+
+# ── CORS (allow file:// and any local origin for demo) ───────────────────────
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 # ── Prometheus metrics (auto-instruments all endpoints) ──────────────────────
 Instrumentator().instrument(app).expose(app)
